@@ -64,10 +64,18 @@ function generateHTML(year, month) {
 }
 
 async function htmlToPdf(html) {
+  const execPath = await chromium.executablePath();
   const browser = await playwright.launch({
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless === true || chromium.headless === 'true',
-    args: chromium.args,
+    executablePath: execPath,
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--single-process',
+      '--disable-dev-shm-usage',
+      '--no-zygote',
+    ],
   });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'networkidle' });
