@@ -127,7 +127,7 @@ function buildPdf(data) {
 
     // ===== TOTALS =====
     y = 435;
-    const totalW = 200;
+    const totalW = 215;
     const totalX = 545 - totalW;
 
     // Sub Total
@@ -135,15 +135,15 @@ function buildPdf(data) {
     doc.text(`IDR${fmt(data.amount)}`, totalX + 140, y, { align: 'right' });
 
     // Total
-    doc.fontSize(12).fillColor(C).font('Helvetica').text('Total', totalX, y + 22);
+    doc.fontSize(10).fillColor(C).font('Helvetica').text('Total', totalX, y + 22);
     doc.text(`IDR${fmt(data.amount)}`, totalX + 140, y + 22, { align: 'right' });
     doc.moveTo(totalX - 10, y + 18).lineTo(545, y + 18).strokeColor(C).stroke();
 
     // Balance Due - red line + amount
     y = y + 50;
     doc.moveTo(545 - totalW - 10, y).lineTo(545, y).strokeColor(R).stroke();
-    doc.fontSize(11).fillColor(R).font('Helvetica').text('Balance Due', totalX, y + 8);
-    doc.fontSize(14).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, totalX + 140, y + 6, { align: 'right' });
+    doc.fontSize(9).fillColor(R).font('Helvetica').text('Balance Due', totalX, y + 8);
+    doc.fontSize(12).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, totalX + 140, y + 6, { align: 'right' });
 
     // ===== PAYMENT SECTION =====
     y = 530;
