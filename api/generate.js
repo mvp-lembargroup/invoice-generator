@@ -66,7 +66,7 @@ function generateHTML(year, month) {
 async function htmlToPdf(html) {
   const browser = await playwright.launch({
     executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
+    headless: chromium.headless === true || chromium.headless === 'true',
     args: chromium.args,
   });
   const page = await browser.newPage();
