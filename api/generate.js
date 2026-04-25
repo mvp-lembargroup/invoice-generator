@@ -1,6 +1,7 @@
-// Vercel Serverless Function — /api/generate
-// Pure Node.js PDF using pdfkit — clean layout, all numbers fit 1 line
-const PDFDocument = require('pdfkit');
+// Vercel Serverless — /api/generate
+// HTML → PDF via @sparticuz/chromium + puppeteer-core
+const chromium = require('@sparticuz/chromium');
+const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -17,8 +18,7 @@ function fmt(n) {
 
 function generateInvoiceData(year, month) {
   const baseNum = config.invoice.startNumber;
-  const baseY = 2026, baseM = 4;
-  const offset = (year - baseY) * 12 + (month - baseM);
+  const offset = (year - 2026) * 12 + (month - 4);
   const invNum = baseNum + offset;
   const invStr = config.invoice.prefix + String(invNum).padStart(6, '0');
   const pad = n => String(n).padStart(2, '0');
@@ -31,107 +31,134 @@ function generateInvoiceData(year, month) {
   return { invStr, invDate, dueDate, mon: names[month-1], year, month, amount: config.invoice.amount };
 }
 
-function buildPdf(data) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    const chunks = [];
-    doc.on('data', c => chunks.push(c));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
+function buildHtml(data) {
+  const a = fmt(data.amount);
+  const [invD, dueD] = [data.invDate, data.dueDate];
+  const { invStr, mon, year: y } = data;
+  const { company, client, invoice, payment } = config;
 
-    const a = fmt(data.amount);
-    let y = 50;
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  @page { margin: 20mm 15mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; font-size: 11px; line-height: 1.5; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .header-left h2 { color: #7f8c8d; font-size: 10px; font-weight: normal; margin-bottom: 4px; }
+  .header-left h1 { font-size: 28px; color: #2c3e50; font-weight: bold; }
+  .header-right { text-align: right; }
+  .header-right .inv-no { font-size: 12px; color: #2c3e50; }
+  .header-right .bal-label { font-size: 9px; color: #e74c3c; margin-top: 8px; }
+  .header-right .bal-amt { font-size: 16px; color: #e74c3c; font-weight: bold; }
+  .line { border: none; border-top: 1px solid #ddd; margin: 10px 0; }
+  .info-grid { display: flex; gap: 80px; margin-bottom: 20px; }
+  .info-grid h3 { font-size: 9px; color: #7f8c8d; font-weight: normal; margin-bottom: 4px; }
+  .info-grid .name { font-size: 12px; color: #2c3e50; font-weight: bold; margin-bottom: 2px; }
+  .info-grid .detail { font-size: 10px; color: #555; white-space: pre-line; }
+  .dates { display: flex; gap: 60px; margin-bottom: 16px; }
+  .dates h4 { font-size: 8px; color: #7f8c8d; font-weight: normal; margin-bottom: 2px; }
+  .dates .val { font-size: 11px; color: #333; }
+  .dates .due-val { font-size: 11px; color: #e74c3c; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  th { background: #2c3e50; color: #fff; font-size: 9px; text-align: left; padding: 7px 8px; }
+  th:last-child { text-align: right; }
+  td { padding: 10px 8px; }
+  .item-row td { background: #f9f9f9; vertical-align: top; }
+  .item-title { font-size: 11px; color: #2c3e50; font-weight: bold; }
+  .item-desc { font-size: 9px; color: #7f8c8d; }
+  .item-amt { font-size: 10px; color: #333; text-align: right; white-space: nowrap; }
+  .totals { width: 280px; margin-left: auto; }
+  .totals td { padding: 3px 8px; }
+  .totals .label { font-size: 9px; color: #7f8c8d; text-align: left; }
+  .totals .value { font-size: 10px; color: #333; text-align: right; white-space: nowrap; }
+  .totals .sep td { border-top: 1px solid #ddd; padding: 0; height: 1px; }
+  .totals .bal-label { font-size: 10px; color: #e74c3c; border-top: 2px solid #e74c3c; padding-top: 6px; }
+  .totals .bal-value { font-size: 13px; color: #e74c3c; font-weight: bold; border-top: 2px solid #e74c3c; padding-top: 6px; text-align: right; white-space: nowrap; }
+  .payment { border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px; }
+  .payment h4 { font-size: 10px; color: #2c3e50; margin-bottom: 6px; }
+  .payment p { font-size: 9px; color: #555; line-height: 1.6; }
+  .footer { font-size: 8px; color: #7f8c8d; text-align: center; margin-top: 40px; }
+</style></head><body>
+  <div class="header">
+    <div class="header-left">
+      <h2>INVOICE</h2>
+      <h1>${company.name}</h1>
+    </div>
+    <div class="header-right">
+      <div class="inv-no">${invStr}</div>
+      <div class="bal-label">BALANCE DUE</div>
+      <div class="bal-amt">IDR ${a}</div>
+    </div>
+  </div>
+  <hr class="line">
+  <div class="info-grid">
+    <div>
+      <h3>FROM</h3>
+      <div class="name">${company.name}</div>
+      <div class="detail">${company.address}\n${company.phone}\n${company.email}</div>
+    </div>
+    <div>
+      <h3>TO</h3>
+      <div class="name">${client.name}</div>
+      <div class="detail">${client.address}</div>
+    </div>
+  </div>
+  <div class="dates">
+    <div><h4>INVOICE DATE</h4><div class="val">${invD}</div></div>
+    <div><h4>TERMS</h4><div class="val">Custom</div></div>
+    <div><h4>DUE DATE</h4><div class="due-val">${dueD}</div></div>
+  </div>
+  <table>
+    <tr><th style="width:30px">#</th><th>ITEM & DESCRIPTION</th><th style="width:140px">AMOUNT</th></tr>
+    <tr class="item-row">
+      <td>1</td>
+      <td>
+        <div class="item-title">${invoice.itemName}</div>
+        <div class="item-desc">${invoice.description.replace('{MONTH}', mon).replace('{YEAR}', String(y))}</div>
+        <div class="item-desc">IDR ${a} x 1.00</div>
+      </td>
+      <td class="item-amt">IDR ${a}</td>
+    </tr>
+  </table>
+  <table class="totals">
+    <tr><td class="label">Sub Total</td><td class="value">IDR ${a}</td></tr>
+    <tr class="sep"><td colspan="2"></td></tr>
+    <tr><td class="label" style="font-size:11px;color:#2c3e50;font-weight:bold">Total</td><td class="value" style="font-size:11px;font-weight:bold">IDR ${a}</td></tr>
+    <tr><td class="bal-label">Balance Due</td><td class="bal-value">IDR ${a}</td></tr>
+  </table>
+  <div class="payment">
+    <h4>Please make payment to:</h4>
+    <p>
+      ${payment.bank} (${payment.accountName})<br>
+      Account Number: ${payment.accountNumber}<br>
+      SWIFT Code: ${payment.swiftCode}  |  Branch: ${payment.branchCode}  |  Bank Code: ${payment.bankCode}<br>
+      Wise: ${payment.wise.email}  |  Phone: ${payment.wise.phone}
+    </p>
+  </div>
+  <div class="footer">
+    Invoice# ${invStr}  |  Invoice Date ${invD}  |  Generated by Jarvis
+  </div>
+</body></html>`;
+}
 
-    // ---- TOP: INVOICE header ----
-    doc.fontSize(9).fillColor('#888').font('Helvetica').text('INVOICE', 50, y);
-    doc.fontSize(26).fillColor('#2c3e50').font('Helvetica').text(config.company.name, 50, y + 10);
+async function generatePdf(data) {
+  const html = buildHtml(data);
 
-    // Right: invoice num
-    doc.fontSize(10).fillColor('#2c3e50').font('Helvetica').text(data.invStr, 380, y, { align: 'right' });
-    doc.fontSize(8).fillColor('#e74c3c').text('BALANCE DUE', 380, y + 16, { align: 'right' });
-    doc.fontSize(13).fillColor('#e74c3c').font('Helvetica').text(`IDR ${a}`, 380, y + 28, { align: 'right' });
-
-    y = 105;
-    doc.moveTo(50, y).lineTo(545, y).strokeColor('#ddd').stroke();
-
-    // ---- FROM / TO ----
-    y = 128;
-    doc.fontSize(9).fillColor('#888').text('FROM', 50, y);
-    doc.fontSize(12).fillColor('#2c3e50').font('Helvetica').text(config.company.name, 50, y + 14);
-    doc.fontSize(10).fillColor('#555').font('Helvetica').text(
-      `${config.company.address}\n${config.company.phone}\n${config.company.email}`, 50, y + 31);
-
-    doc.fontSize(9).fillColor('#888').text('TO', 310, y);
-    doc.fontSize(12).fillColor('#2c3e50').font('Helvetica').text(config.client.name, 310, y + 14);
-    doc.fontSize(10).fillColor('#555').font('Helvetica').text(config.client.address, 310, y + 31);
-
-    // ---- DATES ----
-    y = 245;
-    doc.fontSize(8).fillColor('#888').text('INVOICE DATE', 50, y);
-    doc.fontSize(11).fillColor('#333').font('Helvetica').text(data.invDate, 50, y + 12);
-    doc.fontSize(8).fillColor('#888').text('TERMS', 50, y + 32);
-    doc.fontSize(11).fillColor('#333').font('Helvetica').text('Custom', 50, y + 44);
-
-    // Due Date right
-    doc.fontSize(8).fillColor('#888').text('DUE DATE', 410, y);
-    doc.fontSize(11).fillColor('#e74c3c').font('Helvetica').text(data.dueDate, 410, y + 12);
-
-    // ---- TABLE HEADER ----
-    y = 320;
-    doc.rect(50, y, 495, 24).fillColor('#2c3e50').fill();
-    doc.fillColor('#fff').fontSize(9).font('Helvetica');
-    doc.text('#', 58, y + 7);
-    doc.text('ITEM & DESCRIPTION', 85, y + 7);
-    doc.text('AMOUNT', 530, y + 7, { align: 'right' });
-
-    // ---- ITEM ROW ----
-    y = 350;
-    doc.fillColor('#f9f9f9');
-    doc.rect(50, y, 495, 75).fill();
-    doc.fillColor('#2c3e50').fontSize(11).font('Helvetica').text(config.invoice.itemName, 85, y + 10);
-    doc.fillColor('#888').fontSize(9).font('Helvetica').text(
-      config.invoice.description.replace('{MONTH}', data.mon).replace('{YEAR}', String(data.year)),
-      85, y + 28);
-    doc.fontSize(9).text(`IDR ${a} x 1.00`, 85, y + 42);
-    doc.fillColor('#333').fontSize(10).font('Helvetica').text(`IDR ${a}`, 530, y + 10, { align: 'right' });
-
-    // ---- SUB TOTAL / TOTAL ----
-    y = 440;
-    // Right-aligned block
-    const lx = 330; // label x
-    const vx = 530; // value x (max right)
-    doc.fontSize(9).fillColor('#888').font('Helvetica').text('Sub Total', lx, y);
-    doc.text(`IDR ${a}`, vx, y, { align: 'right' });
-
-    doc.moveTo(lx, y + 16).lineTo(545, y + 16).strokeColor('#ddd').stroke();
-    doc.fontSize(11).fillColor('#2c3e50').font('Helvetica').text('Total', lx, y + 22);
-    doc.text(`IDR ${a}`, vx, y + 22, { align: 'right' });
-
-    doc.moveTo(lx, y + 38).lineTo(545, y + 38).strokeColor('#e74c3c').stroke();
-    doc.fontSize(10).fillColor('#e74c3c').font('Helvetica').text('Balance Due', lx, y + 44);
-    doc.fontSize(12).fillColor('#e74c3c').font('Helvetica').text(`IDR ${a}`, vx, y + 43, { align: 'right' });
-
-    // ---- PAYMENT ----
-    y = 545;
-    doc.moveTo(50, y).lineTo(545, y).strokeColor('#ddd').stroke();
-    doc.fontSize(10).fillColor('#2c3e50').font('Helvetica').text('Please make payment to:', 50, y + 10);
-    doc.fontSize(9).fillColor('#555').font('Helvetica');
-    const payLines = [
-      `${config.payment.bank} (${config.payment.accountName})`,
-      `Account No: ${config.payment.accountNumber}`,
-      `SWIFT: ${config.payment.swiftCode}  Branch: ${config.payment.branchCode}  Bank Code: ${config.payment.bankCode}`,
-      `Wise: ${config.payment.wise.email}  Phone: ${config.payment.wise.phone}`,
-    ];
-    payLines.forEach((l, i) => doc.text(l, 50, y + 28 + i * 14));
-
-    // ---- FOOTER ----
-    doc.fontSize(8).fillColor('#888').font('Helvetica').text(
-      `Invoice# ${data.invStr}  |  Invoice Date ${data.invDate}  |  Generated by Jarvis`,
-      50, 790, { align: 'center' }
-    );
-
-    doc.end();
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: { width: 800, height: 1100 },
+    executablePath: await chromium.executablePath(),
+    headless: 'true',
   });
+
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' } });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
 }
 
 function sendToTelegram(buf, fileName, caption) {
@@ -165,7 +192,7 @@ module.exports = async (req, res) => {
     const year = parseInt(req.query?.year) || now.getFullYear();
     const month = parseInt(req.query?.month) || (now.getMonth() + 1);
     const data = generateInvoiceData(year, month);
-    const pdf = await buildPdf(data);
+    const pdf = await generatePdf(data);
     const fileName = `${data.invStr}.pdf`;
     const caption = `📄 *Invoice ${data.invStr}*\n${config.invoice.itemName} ${data.mon} ${data.year}\n💰 IDR ${fmt(data.amount)}\n📅 Due: ${data.dueDate}`;
 

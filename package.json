@@ -7,6 +7,8 @@
     "vercel-build": "echo 'Build done'"
   },
   "dependencies": {
-    "pdfkit": "^0.16.0"
+    "@sparticuz/chromium": "^147.0.2",
+    "pdfkit": "^0.16.0",
+    "puppeteer-core": "^24.42.0"
   }
 }
