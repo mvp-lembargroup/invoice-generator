@@ -104,7 +104,7 @@ function buildPdf(data) {
     doc.fillColor('#ffffff').fontSize(9).font('Helvetica');
     doc.text('#', 58, y + 7);
     doc.text('ITEM & DESCRIPTION', 90, y + 7);
-    doc.text('AMOUNT', 545, y + 7, { align: 'right' });
+    doc.text('AMOUNT', 535, y + 7, { align: 'right' });
 
     // ===== TABLE ITEM =====
     y = 345;
@@ -123,7 +123,7 @@ function buildPdf(data) {
       `IDR${fmt(data.amount)} x 1.00`,
       90, y + 42
     );
-    doc.fontSize(9).fillColor('#333').font('Helvetica').text(`IDR${fmt(data.amount)}`, 545, y + 10, { align: 'right' });
+    doc.fontSize(9).fillColor('#333').font('Helvetica').text(`IDR${fmt(data.amount)}`, 535, y + 10, { align: 'right' });
 
     // ===== TOTALS =====
     y = 435;
@@ -132,18 +132,18 @@ function buildPdf(data) {
 
     // Sub Total
     doc.fontSize(9).fillColor(G).font('Helvetica').text('Sub Total', totalX, y);
-    doc.text(`IDR${fmt(data.amount)}`, totalX + 140, y, { align: 'right' });
+    doc.text(`IDR${fmt(data.amount)}`, totalX + 130, y, { align: 'right' });
 
     // Total
     doc.fontSize(10).fillColor(C).font('Helvetica').text('Total', totalX, y + 22);
-    doc.text(`IDR${fmt(data.amount)}`, totalX + 140, y + 22, { align: 'right' });
+    doc.text(`IDR${fmt(data.amount)}`, totalX + 130, y + 22, { align: 'right' });
     doc.moveTo(totalX - 10, y + 18).lineTo(545, y + 18).strokeColor(C).stroke();
 
     // Balance Due - red line + amount
     y = y + 50;
     doc.moveTo(545 - totalW - 10, y).lineTo(545, y).strokeColor(R).stroke();
     doc.fontSize(9).fillColor(R).font('Helvetica').text('Balance Due', totalX, y + 8);
-    doc.fontSize(12).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, totalX + 140, y + 6, { align: 'right' });
+    doc.fontSize(12).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, totalX + 130, y + 6, { align: 'right' });
 
     // ===== PAYMENT SECTION =====
     y = 530;
