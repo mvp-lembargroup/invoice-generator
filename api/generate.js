@@ -103,8 +103,8 @@ function buildPdf(data) {
     doc.rect(50, y, 495, 25).fillColor(C).fill();
     doc.fillColor('#ffffff').fontSize(9).font('Helvetica');
     doc.text('#', 58, y + 7);
-    doc.text('ITEM & DESCRIPTION', 100, y + 7);
-    doc.text('AMOUNT', 490, y + 7, { align: 'right' });
+    doc.text('ITEM & DESCRIPTION', 90, y + 7);
+    doc.text('AMOUNT', 545, y + 7, { align: 'right' });
 
     // ===== TABLE ITEM =====
     y = 345;
@@ -114,16 +114,16 @@ function buildPdf(data) {
     doc.rect(50, y, 495, 80).fillColor('#fafafa').fill();
     
     doc.fillColor('#333').font('Helvetica').text('1', 58, y + 10);
-    doc.fontSize(11).fillColor(C).font('Helvetica').text(config.invoice.itemName, 100, y + 10);
+    doc.fontSize(11).fillColor(C).font('Helvetica').text(config.invoice.itemName, 90, y + 10);
     doc.fontSize(9).fillColor(G).font('Helvetica').text(
       config.invoice.description.replace('{MONTH}', data.mon).replace('{YEAR}', String(data.year)),
-      100, y + 28
+      90, y + 28
     );
     doc.fontSize(9).fillColor(G).font('Helvetica').text(
       `IDR${fmt(data.amount)} x 1.00`,
-      100, y + 42
+      90, y + 42
     );
-    doc.fontSize(10).fillColor('#333').font('Helvetica').text(`IDR${fmt(data.amount)}`, 490, y + 10, { align: 'right' });
+    doc.fontSize(9).fillColor('#333').font('Helvetica').text(`IDR${fmt(data.amount)}`, 545, y + 10, { align: 'right' });
 
     // ===== TOTALS =====
     y = 435;
