@@ -62,7 +62,7 @@ function buildPdf(data) {
     // Right: Invoice number + Balance Due
     doc.fontSize(11).fillColor(C).font('Helvetica').text(data.invStr, 320, y, { align: 'right' });
     doc.fontSize(8).fillColor(R).text('BALANCE DUE', 320, y + 18, { align: 'right' });
-    doc.fontSize(13).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, 320, y + 30, { align: 'right' });
+    doc.fontSize(11).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, 320, y + 30, { align: 'right' });
 
     // ===== SEPARATOR =====
     y = 105;
