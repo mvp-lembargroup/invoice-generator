@@ -61,8 +61,8 @@ function buildPdf(data) {
 
     // Right: Invoice number + Balance Due
     doc.fontSize(11).fillColor(C).font('Helvetica').text(data.invStr, 320, y, { align: 'right' });
-    doc.fontSize(9).fillColor(R).text('BALANCE DUE', 320, y + 18, { align: 'right' });
-    doc.fontSize(16).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, 320, y + 30, { align: 'right' });
+    doc.fontSize(8).fillColor(R).text('BALANCE DUE', 320, y + 18, { align: 'right' });
+    doc.fontSize(13).fillColor(R).font('Helvetica').text(`IDR${fmt(data.amount)}`, 320, y + 30, { align: 'right' });
 
     // ===== SEPARATOR =====
     y = 105;
@@ -93,10 +93,10 @@ function buildPdf(data) {
 
     // Due Date - highlighted red box
     const dueBoxX = 340;
-    doc.roundedRect(dueBoxX, y, 205, 60, 4).fillColor('#fdf0ef').fill();
+    doc.roundedRect(dueBoxX, y, 205, 50, 4).fillColor('#fdf0ef').fill();
     doc.fillColor(R).font('Helvetica');
     doc.fontSize(8).text('DUE DATE', dueBoxX + 8, y + 8);
-    doc.fontSize(16).text(data.dueDate, dueBoxX + 8, y + 20);
+    doc.fontSize(12).text(data.dueDate, dueBoxX + 8, y + 22);
 
     // ===== TABLE HEADER =====
     y = 315;
