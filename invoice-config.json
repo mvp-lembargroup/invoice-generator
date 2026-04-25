@@ -1,0 +1,36 @@
+{
+  "company": {
+    "name": "Asep Darmawansyah",
+    "address": "Kuningan, Jawa Barat 45556, Indonesia",
+    "phone": "+6281542917736",
+    "email": "mvp13585@gmail.com"
+  },
+  "client": {
+    "name": "Sleek EV Pte Ltd",
+    "address": "22 Kallang Avenue #03-02, Hong Aik Industrial Building, 339413 Singapore"
+  },
+  "invoice": {
+    "prefix": "LD-",
+    "startNumber": 67,
+    "currency": "IDR",
+    "itemName": "Backend Development Service",
+    "amount": 16000000,
+    "description": "{MONTH} {YEAR}"
+  },
+  "payment": {
+    "bank": "Bank Mandiri",
+    "accountName": "Asep Darmawansyah",
+    "accountNumber": "1390010408031",
+    "swiftCode": "BMRIIDJA",
+    "branchCode": "4864",
+    "bankCode": "008",
+    "wise": {
+      "email": "mvp13585@gmail.com",
+      "phone": "+6281542917736"
+    }
+  },
+  "delivery": {
+    "telegram": true,
+    "email": "asep@sleekev.com"
+  }
+}

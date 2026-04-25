@@ -1,0 +1,13 @@
+{
+  "name": "invoice-generator",
+  "version": "1.0.0",
+  "description": "Monthly invoice PDF generator for Lembar Group",
+  "main": "api/generate.js",
+  "scripts": {
+    "vercel-build": "echo 'Build done'"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^132.0.0",
+    "playwright-core": "^1.50.0"
+  }
+}

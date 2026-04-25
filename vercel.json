@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "api/generate.js": {
+      "includeFiles": "invoice-config.json, invoice-template.html, node_modules/@sparticuz/chromium/**",
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/generate",
+      "schedule": "0 1 25 * *"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { margin: 20mm 15mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11pt; color: #333; line-height: 1.4; padding: 20px 0; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+  .header-left h1 { font-size: 28pt; color: #2c3e50; margin: 0; letter-spacing: 2px; font-weight: 300; }
+  .header-left .label { font-size: 9pt; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .header-right { text-align: right; }
+  .header-right .invoice-no { font-size: 11pt; font-weight: bold; color: #2c3e50; }
+  .header-right .balance-label { color: #e74c3c; font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .header-right .balance-amount { font-size: 16pt; font-weight: bold; color: #e74c3c; }
+
+  hr { border: none; border-top: 1px solid #ddd; margin: 15px 0; }
+
+  .info-grid { display: flex; justify-content: space-between; margin-bottom: 25px; }
+  .info-grid .col { width: 48%; }
+  .info-grid .col-title { font-size: 9pt; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+  .info-grid .col-name { font-size: 12pt; font-weight: bold; color: #2c3e50; }
+  .info-grid .col-detail { font-size: 10pt; color: #555; line-height: 1.6; }
+
+  table.items { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  table.items th { background: #2c3e50; color: #fff; font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; padding: 10px 8px; text-align: left; }
+  table.items th:last-child { text-align: right; }
+  table.items td { padding: 12px 8px; border-bottom: 1px solid #eee; font-size: 10pt; vertical-align: top; }
+  table.items td:last-child { text-align: right; white-space: nowrap; }
+  table.items .item-desc { font-size: 11pt; }
+  table.items .item-sub { font-size: 9pt; color: #888; margin-top: 2px; }
+
+  .totals { margin: 20px 0; margin-left: auto; width: 300px; }
+  .totals .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 10pt; }
+  .totals .row.total { font-size: 13pt; font-weight: bold; color: #2c3e50; border-top: 2px solid #2c3e50; padding-top: 8px; margin-top: 4px; }
+  .totals .row.balance { font-size: 14pt; font-weight: bold; color: #e74c3c; border-top: 2px solid #e74c3c; padding-top: 8px; margin-top: 4px; }
+
+  .payment-section { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; }
+  .payment-section .title { font-size: 10pt; font-weight: bold; color: #2c3e50; margin-bottom: 8px; }
+  .payment-section .detail { font-size: 10pt; color: #555; line-height: 1.6; }
+
+  .powered { text-align: center; margin-top: 40px; font-size: 8pt; color: #aaa; }
+  .powered a { color: #aaa; text-decoration: none; }
+
+  .footer-links { margin-top: 20px; font-size: 9pt; color: #888; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="label">INVOICE</div>
+    <h1>{{COMPANY_NAME}}</h1>
+  </div>
+  <div class="header-right">
+    <div class="invoice-no">{{INVOICE_NUMBER}}</div>
+    <div class="balance-label">BALANCE DUE</div>
+    <div class="balance-amount">{{CURRENCY}}{{BALANCE_AMOUNT}}</div>
+  </div>
+</div>
+
+<hr>
+
+<div class="info-grid">
+  <div class="col">
+    <div class="col-title">FROM</div>
+    <div class="col-name">{{COMPANY_NAME}}</div>
+    <div class="col-detail">
+      {{COMPANY_ADDRESS}}<br>
+      {{COMPANY_PHONE}}<br>
+      {{COMPANY_EMAIL}}
+    </div>
+  </div>
+  <div class="col">
+    <div class="col-title">TO</div>
+    <div class="col-name">{{CLIENT_NAME}}</div>
+    <div class="col-detail">{{CLIENT_ADDRESS}}</div>
+  </div>
+</div>
+
+<div class="info-grid" style="margin-bottom:5px;">
+  <div class="col">
+    <div class="col-title">Invoice Date</div>
+    <div class="col-detail">{{INVOICE_DATE}}</div>
+  </div>
+  <div class="col" style="text-align:right;">
+    <div class="col-title">Due Date</div>
+    <div class="col-detail" style="color:#e74c3c; font-weight:bold; font-size:13pt;">{{DUE_DATE}}</div>
+    <div class="col-title" style="margin-top:2px;">Terms</div>
+    <div class="col-detail">Custom</div>
+  </div>
+</div>
+
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width:60px;">#</th>
+      <th>Item &amp; Description</th>
+      <th style="width:120px;">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>
+        <div class="item-desc">{{ITEM_NAME}}</div>
+        <div class="item-sub">{{ITEM_DESCRIPTION}}</div>
+        <div class="item-sub">{{CURRENCY}}{{AMOUNT}} x 1.00</div>
+      </td>
+      <td>{{CURRENCY}}{{AMOUNT}}.00</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="totals">
+  <div class="row"><span>Sub Total</span><span>{{CURRENCY}}{{AMOUNT}}.00</span></div>
+  <div class="row total"><span>Total</span><span>{{CURRENCY}}{{AMOUNT}}.00</span></div>
+  <div class="row balance"><span>Balance Due</span><span>{{CURRENCY}}{{AMOUNT}}.00</span></div>
+</div>
+
+<div class="payment-section">
+  <div class="title">Please make payment to:</div>
+  <div class="detail">
+    <strong>{{BANK_NAME}}</strong> ({{ACCOUNT_NAME}})<br>
+    Account Number: {{ACCOUNT_NUMBER}}<br>
+    SWIFT Code: {{SWIFT_CODE}}<br>
+    Branch Code: {{BRANCH_CODE}}<br>
+    Bank Code: {{BANK_CODE}}<br>
+    Wise Account: {{WISE_EMAIL}}<br>
+    Phone: {{PHONE_NUMBER}}
+  </div>
+</div>
+
+<div class="footer-links">
+  <span>Invoice# {{INVOICE_NUMBER_SHORT}}</span>
+  <span>Invoice Date {{INVOICE_DATE}}</span>
+  <span>Crafted with care</span>
+</div>
+
+<div class="powered">
+  Generated by <a href="#">Jarvis</a> 🤖
+</div>
+
+</body>
+</html>
