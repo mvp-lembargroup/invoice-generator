@@ -1,7 +1,6 @@
 // Vercel Serverless Function — /api/generate
-// Uses @sparticuz/chromium (optimized for Vercel) + playwright-core
-const chromium = require('@sparticuz/chromium');
-const { chromium: playwright } = require('playwright-core');
+// Pure Node.js PDF generation using pdfkit (no Chromium needed)
+const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -9,12 +8,12 @@ const https = require('https');
 const config = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'invoice-config.json'), 'utf8')
 );
-const botToken = process.env.TELEGRAM_BOT_TOKEN || '8633450666:AAGOkQSOkZI4hqBw8zoLbfo5mUoZC_ldEsQ';
-const chatId = process.env.TELEGRAM_CHAT_ID || '148792235';
+const botToken = process.env.TELEGRAM_BOT_TOKEN;
+const chatId = process.env.TELEGRAM_CHAT_ID;
 
 // ========== HELPERS ==========
 
-function generateHTML(year, month) {
+function generateInvoiceData(year, month) {
   const baseNum = config.invoice.startNumber;
   const baseY = 2026, baseM = 4;
   const offset = (year - baseY) * 12 + (month - baseM);
@@ -30,58 +29,122 @@ function generateHTML(year, month) {
   const names = ['January','February','March','April','May','June',
                  'July','August','September','October','November','December'];
   const mon = names[month - 1];
-  const fmt = n => n.toLocaleString('id-ID', { minimumFractionDigits:2, maximumFractionDigits:2 });
-  const amt = config.invoice.amount;
 
-  let html = fs.readFileSync(path.join(__dirname, '..', 'invoice-template.html'), 'utf8');
-  const reps = {
-    '{{COMPANY_NAME}}': config.company.name,
-    '{{COMPANY_ADDRESS}}': config.company.address,
-    '{{COMPANY_PHONE}}': config.company.phone,
-    '{{COMPANY_EMAIL}}': config.company.email,
-    '{{CLIENT_NAME}}': config.client.name,
-    '{{CLIENT_ADDRESS}}': config.client.address,
-    '{{INVOICE_NUMBER}}': invStr,
-    '{{INVOICE_NUMBER_SHORT}}': invStr,
-    '{{CURRENCY}}': 'IDR',
-    '{{BALANCE_AMOUNT}}': fmt(amt),
-    '{{INVOICE_DATE}}': invDate,
-    '{{DUE_DATE}}': dueDate,
-    '{{ITEM_NAME}}': config.invoice.itemName,
-    '{{ITEM_DESCRIPTION}}': config.invoice.description.replace('{MONTH}', mon).replace('{YEAR}', String(year)),
-    '{{AMOUNT}}': fmt(amt),
-    '{{BANK_NAME}}': config.payment.bank,
-    '{{ACCOUNT_NAME}}': config.payment.accountName,
-    '{{ACCOUNT_NUMBER}}': config.payment.accountNumber,
-    '{{SWIFT_CODE}}': config.payment.swiftCode,
-    '{{BRANCH_CODE}}': config.payment.branchCode,
-    '{{BANK_CODE}}': config.payment.bankCode,
-    '{{WISE_EMAIL}}': config.payment.wise.email,
-    '{{PHONE_NUMBER}}': config.payment.wise.phone,
-  };
-  for (const [k, v] of Object.entries(reps)) html = html.split(k).join(v);
-  return { html, invStr, invDate, dueDate, mon, amount: fmt(amt) };
+  return { invStr, invDate, dueDate, mon, year, month, amount: config.invoice.amount };
 }
 
-async function htmlToPdf(html) {
-  const execPath = await chromium.executablePath();
-  const browser = await playwright.launch({
-    executablePath: execPath,
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-gpu',
-      '--single-process',
-      '--disable-dev-shm-usage',
-      '--no-zygote',
-    ],
+function buildPdf(data) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const fmt = n => n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const C = '#2c3e50';
+    const R = '#e74c3c';
+    const G = '#888';
+    const font = 'Helvetica';
+
+    doc.registerFont('Helvetica', 'Helvetica');
+    doc.registerFont('Helvetica-Bold', 'Helvetica-Bold');
+
+    // ----- Header -----
+    doc.fontSize(9).fillColor(G).text('INVOICE', 50, 45);
+    doc.fontSize(28).fillColor(C).font(font).text(config.company.name, 50, 55);
+
+    // Right side: invoice number & balance
+    doc.fontSize(11).fillColor(C).font(font).text(data.invStr, 350, 45, { align: 'right' });
+    
+    const amtFormatted = fmt(data.amount);
+    doc.fontSize(9).fillColor(R).text('BALANCE DUE', 350, 65, { align: 'right' });
+    doc.fontSize(16).fillColor(R).font(font).text(`IDR${amtFormatted}`, 350, 78, { align: 'right' });
+
+    // ----- Line -----
+    doc.moveTo(50, 110).lineTo(545, 110).strokeColor('#ddd').stroke();
+
+    // ----- Info Grid -----
+    const iy = 130;
+    doc.fontSize(9).fillColor(G).text('FROM', 50, iy);
+    doc.fontSize(12).fillColor(C).font(font).text(config.company.name, 50, iy + 14);
+    doc.fontSize(10).fillColor('#555').font(font).text(
+      `${config.company.address}\n${config.company.phone}\n${config.company.email}`,
+      50, iy + 32
+    );
+
+    doc.fontSize(9).fillColor(G).text('TO', 310, iy);
+    doc.fontSize(12).fillColor(C).font(font).text(config.client.name, 310, iy + 14);
+    doc.fontSize(10).fillColor('#555').font(font).text(config.client.address, 310, iy + 32);
+
+    // ----- Due Date & Dates -----
+    const dy = 240;
+    doc.fontSize(9).fillColor(G).text('Invoice Date', 50, dy);
+    doc.fontSize(10).fillColor('#555').font(font).text(data.invDate, 50, dy + 14);
+
+    doc.fontSize(9).fillColor(G).text('Due Date', 310, dy);
+    doc.fontSize(13).fillColor(R).font(font).text(data.dueDate, 310, dy + 10);
+
+    // ----- Items Table -----
+    const ty = 290;
+    doc.rect(50, ty, 495, 22).fill(C);
+    doc.fillColor('#fff').fontSize(9).font(font).text('#', 58, ty + 6);
+    doc.text('Item & Description', 100, ty + 6);
+    doc.text('Amount', 450, ty + 6, { align: 'right' });
+
+    // Item row
+    doc.fillColor('#333').fontSize(10).font(font).text('1', 58, ty + 35);
+    doc.fontSize(11).fillColor(C).font(font).text(config.invoice.itemName, 100, ty + 35);
+    doc.fontSize(9).fillColor(G).font(font).text(
+      config.invoice.description.replace('{MONTH}', data.mon).replace('{YEAR}', String(data.year)),
+      100, ty + 52
+    );
+    doc.fontSize(9).fillColor(G).font(font).text(
+      `IDR${fmt(config.invoice.amount)} x 1.00`,
+      100, ty + 66
+    );
+    doc.fontSize(10).fillColor('#333').font(font).text(`IDR${fmt(config.invoice.amount)}.00`, 450, ty + 35, { align: 'right' });
+
+    // Line under item
+    const lineY = ty + 92;
+    doc.moveTo(50, lineY).lineTo(545, lineY).strokeColor('#eee').stroke();
+
+    // Totals
+    const tY = lineY + 10;
+    doc.fontSize(10).fillColor('#555').font(font).text('Sub Total', 400, tY, { align: 'right' });
+    doc.text(`IDR${fmt(data.amount)}.00`, 450, tY, { align: 'right' });
+
+    doc.fontSize(13).fillColor(C).font(font).text('Total', 400, tY + 22, { align: 'right' });
+    doc.text(`IDR${fmt(data.amount)}.00`, 450, tY + 22, { align: 'right' });
+
+    const bY = tY + 50;
+    doc.moveTo(350, bY).lineTo(545, bY).strokeColor(R);
+    doc.fontSize(14).fillColor(R).font(font).text('Balance Due', 350, bY + 8, { align: 'right' });
+    doc.text(`IDR${fmt(data.amount)}.00`, 350, bY + 26, { align: 'right' });
+
+    // ----- Payment Section -----
+    const pY = 520;
+    doc.moveTo(50, pY).lineTo(545, pY).strokeColor('#ddd').stroke();
+    doc.fontSize(10).fillColor(C).font(font).text('Please make payment to:', 50, pY + 12);
+    doc.fontSize(10).fillColor('#555').font(font).text(
+      `${config.payment.bank} (${config.payment.accountName})\n` +
+      `Account Number: ${config.payment.accountNumber}\n` +
+      `SWIFT Code: ${config.payment.swiftCode}\n` +
+      `Branch Code: ${config.payment.branchCode}\n` +
+      `Bank Code: ${config.payment.bankCode}\n` +
+      `Wise Account: ${config.payment.wise.email}\n` +
+      `Phone: ${config.payment.wise.phone}`,
+      50, pY + 28
+    );
+
+    // Footer
+    doc.fontSize(8).fillColor(G).font(font).text(
+      `Invoice# ${data.invStr}  |  Invoice Date ${data.invDate}  |  Generated by Jarvis 🤖`,
+      50, 780, { align: 'center' }
+    );
+
+    doc.end();
   });
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: 'networkidle' });
-  const buf = await page.pdf({ format: 'A4', printBackground: true, margin: { top:'20mm', bottom:'20mm', left:'15mm', right:'15mm' } });
-  await browser.close();
-  return buf;
 }
 
 function sendToTelegram(buf, fileName, caption) {
@@ -90,24 +153,17 @@ function sendToTelegram(buf, fileName, caption) {
     let body = '';
     body += `--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${caption}\r\n`;
     body += `--${boundary}\r\nContent-Disposition: form-data; name="document"; filename="${fileName}"\r\nContent-Type: application/pdf\r\n\r\n`;
-
     const head = Buffer.from(body, 'utf8');
     const tail = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
-
     const opts = {
-      hostname: 'api.telegram.org',
+      hostname: 'api.telegram.org', method: 'POST',
       path: `/bot${botToken}/sendDocument?chat_id=${chatId}`,
-      method: 'POST',
       headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': head.length + buf.length + tail.length },
     };
-
     const req = https.request(opts, res => {
       let data = '';
       res.on('data', c => data += c);
-      res.on('end', () => {
-        try { const j = JSON.parse(data); if (j.ok) resolve(j); else reject(new Error(j.description)); }
-        catch(e) { reject(new Error(data)); }
-      });
+      res.on('end', () => { try { const j = JSON.parse(data); if (j.ok) resolve(j); else reject(new Error(j.description)); } catch(e) { reject(new Error(data)); } });
     });
     req.on('error', reject);
     req.write(head); req.write(buf); req.write(tail);
@@ -124,14 +180,14 @@ module.exports = async (req, res) => {
     const month = parseInt(req.query?.month) || (now.getMonth() + 1);
 
     console.log(`Generating ${month}/${year}...`);
-    const { html, invStr, dueDate, mon, amount } = generateHTML(year, month);
-    const pdf = await htmlToPdf(html);
+    const data = generateInvoiceData(year, month);
+    const pdf = await buildPdf(data);
 
-    const fileName = `${invStr}.pdf`;
-    const caption = `📄 *Invoice ${invStr}*\n${config.invoice.itemName} ${mon} ${year}\n💰 IDR ${amount}\n📅 Due: ${dueDate}`;
+    const fileName = `${data.invStr}.pdf`;
+    const caption = `📄 *Invoice ${data.invStr}*\n${config.invoice.itemName} ${data.mon} ${data.year}\n💰 IDR ${fmt(data.amount)}\n📅 Due: ${data.dueDate}`;
 
-    // Send to Telegram on cron or if no manual query params
-    if (req.headers['x-vercel-cron'] === '1' || (!req.query?.year && !req.query?.month)) {
+    // Send to Telegram on cron or if no manual query params specified
+    if (botToken && chatId && (req.headers['x-vercel-cron'] === '1' || (!req.query?.year && !req.query?.month))) {
       const r = await sendToTelegram(pdf, fileName, caption);
       console.log(`Telegram OK: msg=${r.result?.message_id}`);
     }
@@ -144,3 +200,8 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: err.message, stack: err.stack });
   }
 };
+
+// Helper used in template
+function fmt(n) {
+  return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}

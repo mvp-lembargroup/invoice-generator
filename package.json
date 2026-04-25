@@ -7,7 +7,6 @@
     "vercel-build": "echo 'Build done'"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^132.0.0",
-    "playwright-core": "^1.50.0"
+    "pdfkit": "^0.16.0"
   }
 }
