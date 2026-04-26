@@ -173,3 +173,63 @@ function sendToTelegram(buf, fileName, caption) {
       method: 'POST',
       path: `/bot${botToken}/sendDocument?chat_id=${chatId}`,
       headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': head.length + buf.length + tail.length,
+      },
+    };
+
+    const req = https.request(opts, (res) => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(d);
+          if (j && j.ok) resolve(j);
+          else reject(new Error(j && j.description ? j.description : 'Telegram API error'));
+        } catch (e) {
+          reject(new Error('Telegram response parse error'));
+        }
+      });
+    });
+
+    req.on('error', err => reject(err));
+    req.write(head);
+    req.write(buf);
+    req.write(tail);
+    req.end();
+  });
+}
+
+module.exports = async (req, res) => {
+  try {
+    const url = require('url');
+    const q = (req.query && req.query) || (req.url && url.parse(req.url, true).query) || {};
+    const year = parseInt(q.year) || (new Date()).getFullYear();
+    const month = parseInt(q.month) || (new Date()).getMonth() + 1;
+
+    const data = generateInvoiceData(year, month);
+    const pdfBuf = await generatePdf(data);
+
+    if (q.send === '1' || q.send === 'true') {
+      const fileName = `${data.invStr}.pdf`;
+      const caption = `📄 *Invoice ${data.invStr}*\n${config.invoice.itemName} ${data.mon} ${data.year}\n💰 IDR ${fmt(data.amount)}`;
+      try {
+        await sendToTelegram(pdfBuf, fileName, caption);
+        console.log('Telegram: sent');
+      } catch (e) {
+        console.error('Telegram send failed:', e.message || e);
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', pdfBuf.length);
+    res.setHeader('Content-Disposition', `attachment; filename="${data.invStr}.pdf"`);
+    res.statusCode = 200;
+    res.end(pdfBuf);
+  } catch (err) {
+    console.error('Error generating invoice:', err);
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: err.message }));
+  }
+};
