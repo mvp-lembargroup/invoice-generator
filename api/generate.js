@@ -202,8 +202,18 @@ function sendToTelegram(buf, fileName, caption) {
 
 module.exports = async (req, res) => {
   try {
-    const url = require('url');
-    const q = (req.query && req.query) || (req.url && url.parse(req.url, true).query) || {};
+    const q = (req.query && req.query) || (() => {
+      if (!req.url) return {};
+      try {
+        const base = req.headers && req.headers.host ? `http://${req.headers.host}` : 'http://localhost';
+        const parsed = new URL(req.url, base);
+        const params = {};
+        for (const [k, v] of parsed.searchParams.entries()) params[k] = v;
+        return params;
+      } catch (e) {
+        return {};
+      }
+    })();
     const year = parseInt(q.year) || (new Date()).getFullYear();
     const month = parseInt(q.month) || (new Date()).getMonth() + 1;
 
