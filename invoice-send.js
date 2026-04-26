@@ -17,7 +17,7 @@ function fmt(n) {
 const names = ['January','February','March','April','May','June',
                'July','August','September','October','November','December'];
 
-const invUrl = `https://invoice-five-psi-12.vercel.app/api/generate?year=${y}&month=${m}`;
+const invUrl = `https://invoice-generator-puce-nine.vercel.app/api/generate?year=${y}&month=${m}`;
 
 console.log(`⏳ Fetching invoice from Vercel: ${invUrl}`);
 
