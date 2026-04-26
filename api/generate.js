@@ -220,14 +220,22 @@ module.exports = async (req, res) => {
     const data = generateInvoiceData(year, month);
     const pdfBuf = await generatePdf(data);
 
-    if (q.send === '1' || q.send === 'true') {
-      const fileName = `${data.invStr}.pdf`;
-      const caption = `📄 *Invoice ${data.invStr}*\n${config.invoice.itemName} ${data.mon} ${data.year}\n💰 IDR ${fmt(data.amount)}`;
-      try {
-        await sendToTelegram(pdfBuf, fileName, caption);
-        console.log('Telegram: sent');
-      } catch (e) {
-        console.error('Telegram send failed:', e.message || e);
+    const explicitSend = (typeof q.send !== 'undefined') ? (q.send === '1' || q.send === 'true') : undefined;
+    const envHasTelegram = !!(botToken && chatId);
+    const shouldSend = (explicitSend !== undefined) ? explicitSend : envHasTelegram;
+
+    if (shouldSend) {
+      if (!envHasTelegram) {
+        console.warn('Skipping Telegram send: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set');
+      } else {
+        const fileName = `${data.invStr}.pdf`;
+        const caption = `📄 *Invoice ${data.invStr}*\n${config.invoice.itemName} ${data.mon} ${data.year}\n💰 IDR ${fmt(data.amount)}`;
+        try {
+          await sendToTelegram(pdfBuf, fileName, caption);
+          console.log('Telegram: sent');
+        } catch (e) {
+          console.error('Telegram send failed:', e.message || e);
+        }
       }
     }
 
