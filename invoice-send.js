@@ -45,6 +45,11 @@ https.get(invUrl, (res) => {
       sendToTelegram(buf, fileName,
         `📄 *Invoice ${fileName.replace('.pdf', '')}*\n${config.invoice.itemName} ${names[m-1]} ${y}\n💰 IDR ${fmt(config.invoice.amount)}`
       );
+
+      // Send to Email
+      sendEmail(buf, fileName,
+        `Invoice ${config.invoice.itemName} ${names[m-1]} ${y}`
+      );
     } else {
       const body = Buffer.concat(chunks).toString();
       console.error(`❌ Vercel returned ${res.statusCode}: ${body.substring(0, 200)}`);
@@ -53,6 +58,43 @@ https.get(invUrl, (res) => {
 }).on('error', err => {
   console.error('❌ Network error:', err.message);
 });
+
+// Email send via Gmail SMTP
+function sendEmail(buf, fileName, subject) {
+  const nodemailer = require('nodemailer');
+  
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'invoice-config.json'), 'utf8'));
+  const toEmail = config.delivery.email || 'lembargroup@gmail.com';
+  
+  // Use Gmail app password from env or IMAP password
+  const smtpUser = process.env.SMTP_USER || process.env.LEMBARGROUP_IMAP_USER;
+  const smtpPass = process.env.SMTP_PASS || process.env.LEMBARGROUP_IMAP_PASSWORD;
+  
+  if (!smtpUser || !smtpPass) {
+    console.log('⚠️ SMTP credentials not set, skipping email');
+    return;
+  }
+  
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: smtpUser, pass: smtpPass }
+  });
+  
+  const mailOptions = {
+    from: smtpUser,
+    to: toEmail,
+    subject: subject,
+    text: `Invoice terlampir.\n\n${config.invoice.itemName}\nAmount: IDR ${fmt(config.invoice.amount)}`,
+    attachments: [{ filename: fileName, content: buf }]
+  };
+  
+  transporter.sendMail(mailOptions, (err, info) => {
+    if (err) console.log('❌ Email error:', err.message);
+    else console.log('✅ Email sent:', info.response);
+  });
+}
 
 function sendToTelegram(buf, fileName, caption) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
