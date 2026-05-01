@@ -2,6 +2,7 @@
 // HTML → PDF via @sparticuz/chromium + puppeteer-core
 const chromium = require('@sparticuz/chromium');
 const puppeteer = require('puppeteer-core');
+const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -11,6 +12,8 @@ const config = JSON.parse(
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
 
 function fmt(n) {
   return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -200,6 +203,32 @@ function sendToTelegram(buf, fileName, caption) {
   });
 }
 
+function sendEmail(buf, fileName, subject, toEmail, ccEmails) {
+  return new Promise((resolve, reject) => {
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user: smtpUser, pass: smtpPass }
+    });
+
+    const to = toEmail || config.delivery.email;
+    const mailOptions = {
+      from: smtpUser,
+      to: to,
+      cc: ccEmails || '',
+      subject: subject,
+      text: `Invoice ${config.invoice.itemName}\nAmount: IDR ${fmt(config.invoice.amount)}`,
+      attachments: [{ filename: fileName, content: buf }]
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) reject(err);
+      else resolve(info);
+    });
+  });
+}
+
 module.exports = async (req, res) => {
   try {
     const q = (req.query && req.query) || (() => {
@@ -214,27 +243,41 @@ module.exports = async (req, res) => {
         return {};
       }
     })();
-    const year = parseInt(q.year) || (new Date()).getFullYear();
-    const month = parseInt(q.month) || (new Date()).getMonth() + 1;
+
+    const now = new Date();
+    const year = parseInt(q.year) || now.getFullYear();
+    const month = parseInt(q.month) || (now.getMonth() + 1);
 
     const data = generateInvoiceData(year, month);
     const pdfBuf = await generatePdf(data);
 
-    const explicitSend = (typeof q.send !== 'undefined') ? (q.send === '1' || q.send === 'true') : undefined;
-    const envHasTelegram = !!(botToken && chatId);
-    const shouldSend = (explicitSend !== undefined) ? explicitSend : envHasTelegram;
+    // Only send if confirm=true (from confirmation page) - NOT send=true direct
+    const shouldSend = (q.confirm === 'true' || q.confirm === '1');
 
     if (shouldSend) {
-      if (!envHasTelegram) {
-        console.warn('Skipping Telegram send: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set');
-      } else {
-        const fileName = `${data.invStr}.pdf`;
-        const caption = `📄 *Invoice ${data.invStr}*\n${config.invoice.itemName} ${data.mon} ${data.year}\n💰 IDR ${fmt(data.amount)}`;
+      const fileName = `${data.invStr}.pdf`;
+      const subject = `Invoice ${config.invoice.itemName} ${data.mon} ${data.year}`;
+
+      // Send Telegram
+      if (botToken && chatId) {
+        const caption = `📄 Invoice ${data.invStr}\n${config.invoice.itemName} ${data.mon} ${data.year}\n💰 IDR ${fmt(data.amount)}`;
         try {
           await sendToTelegram(pdfBuf, fileName, caption);
           console.log('Telegram: sent');
         } catch (e) {
-          console.error('Telegram send failed:', e.message || e);
+          console.error('Telegram error:', e.message);
+        }
+      }
+
+      // Send Email
+      if (smtpUser && smtpPass) {
+        const toParam = q.to || '';
+        const ccParam = q.cc || config.delivery.cc || '';
+        try {
+          await sendEmail(pdfBuf, fileName, subject, toParam, ccParam);
+          console.log('Email: sent');
+        } catch (e) {
+          console.error('Email error:', e.message);
         }
       }
     }
@@ -245,7 +288,7 @@ module.exports = async (req, res) => {
     res.statusCode = 200;
     res.end(pdfBuf);
   } catch (err) {
-    console.error('Error generating invoice:', err);
+    console.error('Error:', err);
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: err.message }));
